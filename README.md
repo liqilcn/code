@@ -50,11 +50,13 @@ Downloading Pre-trained Models  (Checkpoints with the lowest evaluation loss are
 
 ## GLM-based Outlier Paragraph Detection
 ### Summary generation for the samples of outlier detection dataset 
-To improve computational efficiency, we pre-generate summay under each outlier detection dataset as well as each model, and the generated summary is saved in the corresponding json file. This is an example of summary generation in the case of T5-Large and Delve-OD.
+To improve computational efficiency, we pre-generate summary under each outlier detection dataset as well as each model, and the generated summary is saved in the corresponding json file. This is an example of summary generation in the case of T5-Large and Delve-OD.
 
 ```
 cd ./CODE/t5
-python train_eval_t5.py -model_type base -train_dataset_type large  -dataset_type s2orc -best_ckpt 5625 -ckpts_path ./ckpts/base/s2orc_3e-05_15_812/ -layer_num 5
+python generation.py -mode train -model_type large -dataset_type delve_1k -ckpts_path ./ckpts/large/delve_0.0001_15_614
+python generation.py -mode valid -model_type large -dataset_type delve_1k -ckpts_path ./ckpts/large/delve_0.0001_15_614
+python generation.py -mode test -model_type large -dataset_type delve_1k -ckpts_path ./ckpts/large/delve_0.0001_15_614
 ```
 
 ### CODE
