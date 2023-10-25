@@ -142,7 +142,7 @@ For example, `modeling_bart.py` is located at `"PATH of transformers"/transforme
 In order to improve efficiency, we pre-save the embeddings to be used for training Frozen's FNN. Here is an example of pre-saving the embeddings of T5-Large on Delve-OD (1K):
 ```
 cd ./src/baselines/t5
-python get_embeddings.py -model_size large -dataset_type delve_1k -decoder_layer 23 -init_model_path "PATH of the best checkpoint"
+python get_embeddings.py -model_size large -dataset_type delve_1k -decoder_layer 23 -init_model_path "PATH of the best pre-training checkpoint"
 ```
 * **args.decoder_layer**: the arguments of decoder layers are shown as follows:
 
@@ -156,7 +156,7 @@ python get_embeddings.py -model_size large -dataset_type delve_1k -decoder_layer
 Here is an example for training baseline Frozen on T5-Large and Delve-OD (1K):
 ```
 cd ./src/baselines/t5
-python train_frozen.py -model_size large -dataset_type delve_1k -init_model_path "PATH of the best checkpoint"
+python train_frozen.py -model_size large -dataset_type delve_1k -init_model_path "PATH of the best pre-training checkpoint"
 ```
 Here is an example for testing baseline Frozen on T5-Large and Delve-OD (1K):
 ```
@@ -172,13 +172,13 @@ Here is an example of output.
 Here is an example for training baseline Frozen on T5-Large and Delve-OD (1K):
 ```
 cd ./src/baselines/t5
-python train_ft_all.py -model_size large -dataset_type delve_1k
+python train_ft_all.py -model_size large -dataset_type delve_1k  -decoder_layer 23 -init_model_path "PATH of the best pre-training checkpoint"
 ```
 
 Here is an example for testing baseline Frozen on T5-Large and Delve-OD (1K):
 ```
 cd ./src/baselines/t5
-python test_ft_all.py -model_size large -dataset_type delve_1k
+python test_ft_all.py -model_size large -dataset_type delve_1k -decoder_layer 23 -ckpts_path "PATH of all checkpoints"
 ```
 Here is an example of output.
 ```
