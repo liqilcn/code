@@ -21,7 +21,10 @@ class T5TestDataset(Dataset):
         self.tokenizer = tokenizer
         self.args = args
         self.config = config
-        jsonlines = json.load(open(f'{dataset_path}{mode}_{self.args.dataset_type}.json', 'r'))
+        if self.args.dataset_type.startswith('delve') and (mode == 'valid' or mode == 'test'):
+            jsonlines = json.load(open(f'{dataset_path}{mode}_delve.json', 'r'))
+        else:
+            jsonlines = json.load(open(f'{dataset_path}{mode}_{self.args.dataset_type}.json', 'r'))
         self.datas = []
         for json_line in tqdm(jsonlines):
             truncated_multi_docs = []
@@ -64,17 +67,16 @@ class T5TestDataset(Dataset):
 
 if __name__ == "__main__":
     flags = argparse.ArgumentParser()
-    flags.add_argument('-model_type',          default='large', type=str)
+    flags.add_argument('-model_size',          default='large', type=str)
     flags.add_argument('-layer_num',           default=23,  type=int)  
     flags.add_argument('-is_medfilter',        default=True,  type=bool) 
     flags.add_argument('-filter_wind',        default=5,  type=int) 
     flags.add_argument('-exp_task',            default='filter_wind', type=str)  # main_result, diff_layer, diff_ckpt
     flags.add_argument('-dataset_path',        default='../../new_data_for_lw/', type=str)
     flags.add_argument('-dataset_type',        default='s2orc', type=str)
-    flags.add_argument('-train_dataset_type',  default='small', type=str)
     flags.add_argument('-tokenizer_path',      default=f'../tokenizer_config/', type=str)
     flags.add_argument('-init_model_path',     default=f'../init_model/', type=str)
-    flags.add_argument('-best_ckpt',           default='ckpt', type=str)
+    flags.add_argument('-best_ckpt',           default='assigned', type=str)  # option: 'init', 'auto', 'assigned'
     flags.add_argument('-ckpts_path',          default=f'../ckpts/base/s2orc_0.0001_15_314/', type=str)
     flags.add_argument('-max_src_len',         default=1024,    type=int)
     flags.add_argument('-max_tgt_len',         default=100,      type=int)
@@ -85,25 +87,25 @@ if __name__ == "__main__":
     flags.add_argument('-mode',                default='train',    type=str)
 
     args, unknown   = flags.parse_known_args()
-    if args.best_ckpt == 'ckpt':
+    if args.best_ckpt == 'auto':
         best_ckpt = get_best_step(args.ckpts_path)
         ckpt_path = f'{args.ckpts_path}/checkpoint-{best_ckpt}'
     elif args.best_ckpt == 'init':
         best_ckpt = 'init'
         ckpt_path = args.init_model_path
-    else:
-        best_ckpt = args.best_ckpt
-        ckpt_path = f'{args.ckpts_path}checkpoint-{args.best_ckpt}'
+    elif args.best_ckpt == 'assigned'::
+        best_ckpt = 'assigned'
+        ckpt_path = args.ckpts_path
     
     # is_medfilter_flag = 'have_medfilter' if args.is_medfilter else 'no_medfilter'
-    # hyper_parameter_search_result = json.load(open(f'./hyper_para_search_result_for_{args.exp_task}/{args.dataset_type}_{args.train_dataset_type}_{args.model_type}_ckpt-{best_ckpt}_layer{args.layer_num}_{is_medfilter_flag}.json', 'r'))
+    # hyper_parameter_search_result = json.load(open(f'./hyper_para_search_result_for_{args.exp_task}/{args.dataset_type}_{args.train_dataset_type}_{args.model_size}_ckpt-{best_ckpt}_layer{args.layer_num}_{is_medfilter_flag}.json', 'r'))
     # args.alpha = hyper_parameter_search_result[0][0]
     # args.beta = hyper_parameter_search_result[0][1]
     print(args)
     device = f'cuda:{args.device}' if torch.cuda.is_available() else 'cpu'
 
-    args.tokenizer_path = f'{args.tokenizer_path}{args.model_type}/'
-    args.init_model_path = f'{args.init_model_path}{args.model_type}/'
+    args.tokenizer_path = f'{args.tokenizer_path}{args.model_size}/'
+    args.init_model_path = f'{args.init_model_path}{args.model_size}/'
 
     tokenizer = T5Tokenizer.from_pretrained(args.tokenizer_path, local_files_only=True)
     tokenizer.add_special_tokens({"additional_special_tokens": ['<doc-sep>','<sen-sep>']}) 
@@ -149,8 +151,15 @@ if __name__ == "__main__":
             string = tokenizer.decode(output[0]).replace('<pad>', '').replace('<sen-sep>', '').replace('</s>', '')
             sequence.append(string.strip())
             # break
-    try:
-        with open(f"./t5_{args.model_type}_{args.dataset_type}_{args.train_dataset_type}_{args.mode}.json",'w+') as file:
-            file.write(json.dumps(sequence, indent=2, ensure_ascii=False))
-    except:
-        pickle.dump(sequence, open(f"./t5_{args.model_type}_{args.dataset_type}_{args.train_dataset_type}_{args.mode}.pkl", 'wb'))
+    
+    if self.args.dataset_type.startswith('delve') and (args.mode == 'valid' or args.mode == 'test'):
+        origin_dataset = json.load(open(f'{args.dataset_path}{args.mode}_delve.json', 'r'))
+    else:
+        origin_dataset = json.load(open(f'{args.dataset_path}{args.mode}_{self.args.dataset_type}.json', 'r'))
+    assert len(sequence)== len(origin_dataset)
+    if not os.path.exists('./datasets_with_generated_summary'): os.makedirs('./datasets_with_generated_summary')
+
+    for i in range(len(sequence)):
+        origin_dataset[i]['txt_gds'][0] = generated_txt[i].strip(', ')
+
+    json.dump(origin_dataset, open(f'./datasets_with_generated_summary/{args.mode}_t5_{args.model_size}_{args.dataset_type}.json', 'w'))

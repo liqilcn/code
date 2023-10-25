@@ -136,36 +136,9 @@ def mean_sum_pooling(attn_tensor, generated_seq, tokenizer, input_txt, args):
         final_scores.append(sen2all_doc_scores)
     return final_scores
 
-# def word_frequency_count(attn_tensors, tokenizer):
-#     # 统计生成的文本中的词频，返回词为单位，以及句子为单位的统计结果
-#     sen_sep_id = tokenizer.convert_tokens_to_ids('<sen-sep>')
-    
-#     all_ids = []  # 句子中token不去重统计频率
-#     all_sen_ids = []  # 对每个句子中出现的token去重后统计频率
-#     for data in attn_tensors:
-#         generated_seq = data['generated_seq']
-#         generated_seq_ids = generated_seq[1:-1]
-#         generated_txt_sep_idx = torch.nonzero(generated_seq_ids == sen_sep_id).squeeze()
-#         generated_seq_interval_tuple = [(generated_txt_sep_idx[i], generated_txt_sep_idx[i+1]) for i in range(len(generated_txt_sep_idx)-1)]
-#         for i in range(len(generated_seq_interval_tuple)):
-#             generated_sen_start_idx = generated_seq_interval_tuple[i][0] + 1
-#             generated_sen_end_idx = generated_seq_interval_tuple[i][1]
-#             sub_generated_seq_ids = generated_seq_ids[generated_sen_start_idx:generated_sen_end_idx]
-#             sub_generated_seq_ids_list = sub_generated_seq_ids.cpu().numpy().tolist()
-#             all_ids += sub_generated_seq_ids_list
-#             all_sen_ids += list(set(sub_generated_seq_ids_list))
-    
-#     all_ids_count=collections.Counter(all_ids)
-#     all_ids_count = dict(sorted(all_ids_count.items(), key=lambda x:x[1],reverse=True))
-#     all_tokens_counts = {tokenizer.convert_ids_to_tokens(tid): all_ids_count[tid] for tid in all_ids_count}
-#     all_sen_ids_count=collections.Counter(all_sen_ids)
-#     all_sen_ids_count = dict(sorted(all_sen_ids_count.items(), key=lambda x:x[1],reverse=True))
-#     all_sen_tokens_counts = {tokenizer.convert_ids_to_tokens(tid): all_sen_ids_count[tid] for tid in all_sen_ids_count}
-#     return all_ids_count, all_tokens_counts, all_sen_ids_count, all_sen_tokens_counts
-
 def word_frequency_count(tokenizer, args):
     # 统计生成的文本中的词频，返回词为单位，以及句子为单位的统计结果
-    jsonlines = json.load(open(f'{args.dataset_path}train_{args.dataset_type}_{args.train_dataset_type}.json', 'r'))
+    jsonlines = json.load(open(f'./datasets_with_generated_summary/train_bart_{self.args.model_size}_{self.args.dataset_type}.json', 'r'))
     all_ids = []
     for line in jsonlines:
         truncked_summary_ids = tokenizer.encode(line['txt_gds'], max_length=args.max_tgt_len+2, truncation=True)[1:-1]
@@ -179,7 +152,7 @@ class RelationBARTTestDataset(Dataset):
         self.tokenizer = tokenizer
         self.args = args
         self.config = config
-        jsonlines = json.load(open(f'./test/{mode}_{self.args.model_type}_{self.args.dataset_type}.json', 'r'))
+        jsonlines = json.load(open(f'./datasets_with_generated_summary/{mode}_bart_{self.args.model_size}_{self.args.dataset_type}.json', 'r'))
         self.datas = []
         for json_line in tqdm(jsonlines):
             truncated_multi_docs = []
@@ -226,11 +199,10 @@ class RelationBARTTestDataset(Dataset):
 if __name__ == "__main__":
     setup_seed()
     flags = argparse.ArgumentParser()
-    flags.add_argument('-model_type',          default='base', type=str)  # ,'mean_sum','mean','middle','max'
+    flags.add_argument('-model_size',          default='base', type=str)  # ,'mean_sum','mean','middle','max'
     flags.add_argument('-layer_num',           default=5,  type=int)  # ,'mean_sum','mean','middle','max'
     flags.add_argument('-is_medfilter',        default=True,  type=bool)
     flags.add_argument('-exp_task',            default='main_result', type=str)  # main_result, diff_layer, diff_ckpt
-    flags.add_argument('-train_dataset_type',  default='small', type=str)
     flags.add_argument('-dataset_path',        default='../new_data_for_lw/', type=str)
     flags.add_argument('-dataset_type',        default='samsum', type=str)
     flags.add_argument('-tokenizer_path',      default=f'./tokenizer_config/', type=str)
@@ -261,14 +233,14 @@ if __name__ == "__main__":
         
 
     is_medfilter_flag = 'have_medfilter' if args.is_medfilter else 'no_medfilter'
-    hyper_parameter_search_result = json.load(open(f'./hyper_backup/hyper_para_search_result_for_{args.exp_task}/{args.dataset_type}_{args.train_dataset_type}_{args.model_type}_ckpt-{best_ckpt}_layer{args.layer_num}_{is_medfilter_flag}.json', 'r'))
+    hyper_parameter_search_result = json.load(open(f'./hyper_para_search_result_for_{args.exp_task}/{args.dataset_type}_{args.model_size}_ckpt-{best_ckpt}_layer{args.layer_num}_{is_medfilter_flag}.json', 'r'))
     args.alpha = hyper_parameter_search_result[0][0]
     args.beta = hyper_parameter_search_result[0][1]
     print(args)
     device = f'cuda:{args.device}' if torch.cuda.is_available() else 'cpu'
 
-    args.tokenizer_path = f'{args.tokenizer_path}{args.model_type}/'
-    args.init_model_path = f'{args.init_model_path}{args.model_type}/'
+    args.tokenizer_path = f'{args.tokenizer_path}{args.model_size}/'
+    args.init_model_path = f'{args.init_model_path}{args.model_size}/'
 
     tokenizer = BartTokenizer.from_pretrained(args.tokenizer_path, local_files_only=True)
     tokenizer.add_special_tokens({"additional_special_tokens": ['<doc-sep>','<sen-sep>']}) 
@@ -384,11 +356,11 @@ if __name__ == "__main__":
             single_stgy_result[stgy]['95fpr'] = compute_fpr95(y_true, y_score)
             single_stgy_result[stgy]['auroc'] = roc_auc_score(y_true, y_score)
             single_stgy_result[stgy]['aupr'] = average_precision_score(y_true, y_score)
-        print(single_stgy_result)
+        print(single_stgy_result['mean_sum'])
         if args.best_ckpt == 'init':
             args.best_ckpt = '0'
         if not os.path.exists(f'./result_of_{args.exp_task}'): os.makedirs(f'./result_of_{args.exp_task}')
-        json.dump(single_stgy_result, open(f'./result_of_{args.exp_task}/{args.dataset_type}_{args.train_dataset_type}_{args.model_type}_ckpt-{best_ckpt}_layer{args.layer_num}_{is_medfilter_flag}.json', 'w'))
+        json.dump(single_stgy_result, open(f'./result_of_{args.exp_task}/{args.dataset_type}_{args.model_size}_ckpt-{best_ckpt}_layer{args.layer_num}_{is_medfilter_flag}.json', 'w'))
         if args.output_scores:
             json.dump(scores_for_roc, open('our_method_for_roc.json', 'w'))
 

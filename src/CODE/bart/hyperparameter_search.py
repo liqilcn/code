@@ -157,7 +157,7 @@ class BARTTestDataset(Dataset):
         self.args = args
         self.config = config
         
-        jsonlines = json.load(open(f'{dataset_path}{mode}_{self.args.model_type}_{self.args.dataset_type}_{self.args.train_dataset_type}.json', 'r'))
+        jsonlines = json.load(open(f'./datasets_with_generated_summary/{mode}_bart_{args.model_size}_{args.dataset_type}.json', 'r'))
         self.datas = []
         for json_line in tqdm(jsonlines):
             truncated_multi_docs = []
@@ -204,12 +204,11 @@ class BARTTestDataset(Dataset):
 if __name__ == "__main__":
     setup_seed()
     flags = argparse.ArgumentParser()
-    flags.add_argument('-model_type',          default='large', type=str)
+    flags.add_argument('-model_size',          default='large', type=str)
     flags.add_argument('-dataset_path',        default='./test/', type=str)
     flags.add_argument('-dataset_type',        default='s2orc', type=str)
-    flags.add_argument('-train_dataset_type',  default='small', type=str)
     flags.add_argument('-layer_num',           default=11, type=int)
-    flags.add_argument('-filter_wind',           default=5, type=int)
+    flags.add_argument('-filter_wind',         default=5, type=int)
     flags.add_argument('-is_medfilter',        default=True,  type=bool)
     flags.add_argument('-tokenizer_path',      default=f'./tokenizer_config/', type=str)
     flags.add_argument('-init_model_path',     default=f'./init_model/', type=str)
@@ -225,8 +224,8 @@ if __name__ == "__main__":
     device = f'cuda:{args.device}' if torch.cuda.is_available() else 'cpu'
     print(args)
 
-    args.tokenizer_path = f'{args.tokenizer_path}{args.model_type}/'
-    args.init_model_path = f'{args.init_model_path}{args.model_type}/'
+    args.tokenizer_path = f'{args.tokenizer_path}{args.model_size}/'
+    args.init_model_path = f'{args.init_model_path}{args.model_size}/'
 
     tokenizer = BartTokenizer.from_pretrained(args.tokenizer_path, local_files_only=True)
     tokenizer.add_special_tokens({"additional_special_tokens": ['<doc-sep>','<sen-sep>']}) 
@@ -371,26 +370,25 @@ if __name__ == "__main__":
             except:
                 print(y_score)
             
-            # json.dump([alpha, beta, fpr95], open(f'./temp_hyper_para_{args.dataset_type}_{args.model_type}_{args.exp_task}/{alpha}_{beta}.json', 'w'))
-            json.dump([alpha, beta, fpr95, auroc, aupr], open(f'./temp_hyper_para_{args.dataset_type}_{args.model_type}_{args.exp_task}/{alpha}_{beta}.json', 'w'))
+            json.dump([alpha, beta, fpr95, auroc, aupr], open(f'./temp_hyper_para_{args.dataset_type}_{args.model_size}_{args.exp_task}/{alpha}_{beta}.json', 'w'))
 
         all_arg = []
         for alpha in tqdm(np.arange(0,2.1,0.2)):
             for beta in np.arange(0,1.1,0.1):
                 all_arg.append([all_scores_for_para_search, all_top2_gd, alpha, beta])
         
-        if os.path.exists(f'./temp_hyper_para_{args.dataset_type}_{args.model_type}_{args.exp_task}'): shutil.rmtree(f'./temp_hyper_para_{args.dataset_type}_{args.model_type}_{args.exp_task}')
-        os.makedirs(f'./temp_hyper_para_{args.dataset_type}_{args.model_type}_{args.exp_task}')
+        if os.path.exists(f'./temp_hyper_para_{args.dataset_type}_{args.model_size}_{args.exp_task}'): shutil.rmtree(f'./temp_hyper_para_{args.dataset_type}_{args.model_size}_{args.exp_task}')
+        os.makedirs(f'./temp_hyper_para_{args.dataset_type}_{args.model_size}_{args.exp_task}')
         with Pool(60) as pool:
             pool.map(hyper_para_search_worker, all_arg)
 
         all_search_result = []
-        for file in tqdm(os.listdir(f'./temp_hyper_para_{args.dataset_type}_{args.model_type}_{args.exp_task}')):
-                all_search_result.append(json.load(open(f'./temp_hyper_para_{args.dataset_type}_{args.model_type}_{args.exp_task}/{file}', 'r')))
+        for file in tqdm(os.listdir(f'./temp_hyper_para_{args.dataset_type}_{args.model_size}_{args.exp_task}')):
+                all_search_result.append(json.load(open(f'./temp_hyper_para_{args.dataset_type}_{args.model_size}_{args.exp_task}/{file}', 'r')))
         all_search_result = sorted(all_search_result, key=lambda x: float(x[2]))
-        shutil.rmtree(f'./temp_hyper_para_{args.dataset_type}_{args.model_type}_{args.exp_task}')
+        shutil.rmtree(f'./temp_hyper_para_{args.dataset_type}_{args.model_size}_{args.exp_task}')
         is_medfilter_flag = 'have_medfilter' if args.is_medfilter else 'no_medfilter'
         if not os.path.exists(f'./hyper_para_search_result_for_{args.exp_task}'): 
             os.makedirs(f'./hyper_para_search_result_for_{args.exp_task}')
-        json.dump(all_search_result, open(f'./hyper_para_search_result_for_{args.exp_task}/{args.dataset_type}_{args.train_dataset_type}_{args.model_type}_ckpt-{best_ckpt}_layer{args.layer_num}_{is_medfilter_flag}_{args.filter_wind}.json', 'w'))
+        json.dump(all_search_result, open(f'./hyper_para_search_result_for_{args.exp_task}/{args.dataset_type}_{args.model_size}_ckpt-{best_ckpt}_layer{args.layer_num}_{is_medfilter_flag}_{args.filter_wind}.json', 'w'))
 

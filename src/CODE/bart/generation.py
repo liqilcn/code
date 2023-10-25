@@ -1,4 +1,4 @@
-import os, re, csv, math, sys, time, requests,torch,random,logging,argparse,json,nltk, pickle
+ import os, re, csv, math, sys, time, requests,torch,random,logging,argparse,json,nltk, pickle
 import datetime
 import collections
 from string import punctuation
@@ -20,8 +20,10 @@ class RelationBARTTestDataset(Dataset):
         self.tokenizer = tokenizer
         self.args = args
         self.config = config
-        # jsonlines = json.load(open(f'{dataset_path}{mode}_pretrain_{self.args.dataset_type}.json', 'r'))
-        jsonlines = json.load(open(f'{dataset_path}{mode}_{self.args.dataset_type}.json', 'r'))
+        if self.args.dataset_type.startswith('delve') and (mode == 'valid' or mode == 'test'):
+            jsonlines = json.load(open(f'{dataset_path}{mode}_delve.json', 'r'))
+        else:
+            jsonlines = json.load(open(f'{dataset_path}{mode}_{self.args.dataset_type}.json', 'r'))
         self.datas = []
         for json_line in tqdm(jsonlines):
             truncated_multi_docs = []
@@ -67,7 +69,7 @@ class RelationBARTTestDataset(Dataset):
 
 if __name__ == "__main__":
     flags = argparse.ArgumentParser()
-    flags.add_argument('-model_type',          default='base', type=str)  # ,'mean_sum','mean','middle','max'
+    flags.add_argument('-model_size',          default='base', type=str)  # ,'mean_sum','mean','middle','max'
     flags.add_argument('-dataset_path',        default='../../4to1_dataset/', type=str)
     flags.add_argument('-dataset_type',        default='s2orc', type=str)
     flags.add_argument('-batch_size',          default=10, type=int)
@@ -75,7 +77,7 @@ if __name__ == "__main__":
     flags.add_argument('-tokenizer_path',      default=f'../tokenizer_config/', type=str)
     flags.add_argument('-init_model_path',     default=f'../init_model/', type=str)
 
-    flags.add_argument('-best_ckpt',           default='ckpt', type=str)
+    flags.add_argument('-best_ckpt',           default='assigned', type=str)  # option: 'init', 'auto', 'assigned'
     flags.add_argument('-ckpts_path',          default=f'../ckpts/base/s2orc_3e-05_15_812/', type=str)
 
     flags.add_argument('-max_src_len',         default=1024,    type=int)
@@ -90,22 +92,21 @@ if __name__ == "__main__":
 
     args, unknown   = flags.parse_known_args()
     
-    if args.best_ckpt == 'ckpt':
+    if args.best_ckpt == 'auto':
         best_ckpt = get_best_step(args.ckpts_path)
         ckpt_path = f'{args.ckpts_path}/checkpoint-{best_ckpt}'
     elif args.best_ckpt == 'init':
         best_ckpt = 'init'
         ckpt_path = args.init_model_path
-    else:
-        best_ckpt = args.best_ckpt
-        ckpt_path = f'{args.ckpts_path}checkpoint-{args.best_ckpt}'
-    args.best_ckpt = best_ckpt
+    elif args.best_ckpt == 'assigned':
+        best_ckpt = 'assigned'
+        ckpt_path = args.ckpts_path
 
     print(args)
     device = f'cuda:{args.device}' if torch.cuda.is_available() else 'cpu'
 
-    args.tokenizer_path = f'{args.tokenizer_path}{args.model_type}/'
-    args.init_model_path = f'{args.init_model_path}{args.model_type}/'
+    args.tokenizer_path = f'{args.tokenizer_path}{args.model_size}/'
+    args.init_model_path = f'{args.init_model_path}{args.model_size}/'
 
     tokenizer = BartTokenizer.from_pretrained(args.tokenizer_path, local_files_only=True)
     tokenizer.add_special_tokens({"additional_special_tokens": ['<doc-sep>','<sen-sep>']}) 
@@ -125,7 +126,6 @@ if __name__ == "__main__":
         model_config.preseqlen = 0
         model_config.vocab_size = len(tokenizer)
 
-        ckpt_path = f'{args.ckpts_path}/checkpoint-{args.best_ckpt}'
         model = BartForConditionalGeneration.from_pretrained(ckpt_path, local_files_only=True, config=model_config).to(device)
     print(ckpt_path)
     
@@ -164,8 +164,19 @@ if __name__ == "__main__":
 
     generated_txt = [t.replace('<sen-sep>', '').replace('</s>', '').replace('<s>', '').replace('<pad>', '') for t in generated_txt]
     
-    with open(f"./bart_{args.model_type}_{args.dataset_type}_{args.mode}.json",'w+') as file:
-        file.write(json.dumps(generated_txt, indent=2, ensure_ascii=False))
+    # 将生成的summary写入到原始数据集中，不同模型的size，type和不同的数据集生成的summary不尽相同
+    if self.args.dataset_type.startswith('delve') and (args.mode == 'valid' or args.mode == 'test'):
+        origin_dataset = json.load(open(f'{args.dataset_path}{args.mode}_delve.json', 'r'))
+    else:
+        origin_dataset = json.load(open(f'{args.dataset_path}{args.mode}_{self.args.dataset_type}.json', 'r'))
+    
+    assert len(generated_txt)== len(origin_dataset)
+    if not os.path.exists('./datasets_with_generated_summary'): os.makedirs('./datasets_with_generated_summary')
+
+    for i in range(len(generated_txt)):
+        origin_dataset[i]['txt_gds'][0] = generated_txt[i].strip(', ')
+
+    json.dump(origin_dataset, open(f'./datasets_with_generated_summary/{args.mode}_bart_{args.model_size}_{args.dataset_type}.json', 'w'))
 
 
 

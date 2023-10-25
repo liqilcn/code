@@ -157,7 +157,7 @@ class T5TestDataset(Dataset):
         self.tokenizer = tokenizer
         self.args = args
         self.config = config
-        jsonlines = json.load(open(f'./test/{mode}_{self.args.model_type}_{self.args.dataset_type}_{self.args.train_dataset_type}.json', 'r'))
+        jsonlines = json.load(open(f'./datasets_with_generated_summary/{mode}_t5_{self.args.model_size}_{self.args.dataset_type}.json', 'r'))
         self.datas = []
         for json_line in tqdm(jsonlines):
             truncated_multi_docs = []
@@ -205,18 +205,16 @@ class T5TestDataset(Dataset):
 
 if __name__ == "__main__":
     setup_seed()
-    model_type = 'large'
     flags = argparse.ArgumentParser()
-    flags.add_argument('-model_type',          default='base', type=str)
+    flags.add_argument('-model_size',          default='base', type=str)
     flags.add_argument('-dataset_path',        default='../train_eval_t5/test/', type=str)
     flags.add_argument('-dataset_type',        default='s2orc', type=str)
-    flags.add_argument('-train_dataset_type',  default='large', type=str)
     flags.add_argument('-layer_num',           default=23, type=int)
-    flags.add_argument('-filter_wind',           default=5, type=int)
+    flags.add_argument('-filter_wind',         default=5, type=int)
     flags.add_argument('-is_medfilter',        default=True,  type=bool)  
     flags.add_argument('-tokenizer_path',      default=f'./tokenizer_config/', type=str)
     flags.add_argument('-init_model_path',     default=f'./init_model/', type=str)
-    flags.add_argument('-best_ckpt',           default='ckpt', type=str)
+    flags.add_argument('-best_ckpt',           default='assigned', type=str) # option: 'init', 'auto', 'assigned'
     flags.add_argument('-ckpts_path',          default=f'./ckpts/base/s2orc_0.0002_15_1212/', type=str)
     flags.add_argument('-exp_task',            default='filter_wind', type=str)  # main_result, hyper-para_sen, diff_layer, diff_ckpt
     flags.add_argument('-max_src_len',         default=1024,    type=int)
@@ -228,32 +226,31 @@ if __name__ == "__main__":
     device = f'cuda:{args.device}' if torch.cuda.is_available() else 'cpu'
     print(args)
 
-    args.tokenizer_path = f'{args.tokenizer_path}{args.model_type}/'
-    args.init_model_path = f'{args.init_model_path}{args.model_type}/'
+    args.tokenizer_path = f'{args.tokenizer_path}{args.model_size}/'
+    args.init_model_path = f'{args.init_model_path}{args.model_size}/'
 
     tokenizer = T5Tokenizer.from_pretrained(args.tokenizer_path, local_files_only=True)
     tokenizer.add_special_tokens({"additional_special_tokens": ['<doc-sep>','<sen-sep>']}) 
 
     if args.best_ckpt == 'init':
+        best_ckpt = 'init'
         model_config = T5Config.from_pretrained(args.init_model_path, local_files_only=True)
         ckpt_path = args.init_model_path
-        best_ckpt = args.best_ckpt
         
         model = T5ForConditionalGeneration.from_pretrained(ckpt_path, local_files_only=True, config=model_config).to(device)
         model.resize_token_embeddings(len(tokenizer))
-    elif args.best_ckpt == 'ckpt':
+    elif args.best_ckpt == 'auto':
         model_config = T5Config.from_pretrained(args.init_model_path, local_files_only=True)
         model_config.vocab_size = len(tokenizer)
         
         best_ckpt = get_best_step(args.ckpts_path)
         ckpt_path = f'{args.ckpts_path}/checkpoint-{best_ckpt}'
         model = T5ForConditionalGeneration.from_pretrained(ckpt_path, local_files_only=True, config=model_config).to(device)
-    else:
+    elif args.best_ckpt == 'assigned':
+        best_ckpt = 'assigned'
         model_config = T5Config.from_pretrained(args.init_model_path, local_files_only=True)
         model_config.vocab_size = len(tokenizer)
-        ckpt_path = f'{args.ckpts_path}/checkpoint-{args.best_ckpt}'
-        
-        best_ckpt = args.best_ckpt
+        ckpt_path = args.ckpts_path
         model = T5ForConditionalGeneration.from_pretrained(ckpt_path, local_files_only=True, config=model_config).to(device)
     print(ckpt_path)
 
@@ -368,27 +365,27 @@ if __name__ == "__main__":
             fpr95 = compute_fpr95(y_true, y_score)
             auroc = roc_auc_score(y_true, y_score)
             aupr = average_precision_score(y_true, y_score)
-            json.dump([alpha, beta, fpr95, auroc, aupr], open(f'./temp_hyper_para_{args.dataset_type}_{args.model_type}_{args.exp_task}/{alpha}_{beta}.json', 'w'))
+            json.dump([alpha, beta, fpr95, auroc, aupr], open(f'./temp_hyper_para_{args.dataset_type}_{args.model_size}_{args.exp_task}/{alpha}_{beta}.json', 'w'))
             
-            # json.dump([alpha, beta, fpr95], open(f'./temp_hyper_para_{args.dataset_type}_{args.model_type}_{args.exp_task}/{alpha}_{beta}.json', 'w'))
+            # json.dump([alpha, beta, fpr95], open(f'./temp_hyper_para_{args.dataset_type}_{args.model_size}_{args.exp_task}/{alpha}_{beta}.json', 'w'))
 
         all_arg = []
         for alpha in tqdm(np.arange(0,2.1,0.2)):
             for beta in np.arange(0,1.1,0.1):
                 all_arg.append([all_scores_for_para_search, all_top2_gd, alpha, beta])
         
-        if os.path.exists(f'./temp_hyper_para_{args.dataset_type}_{args.model_type}_{args.exp_task}'): 
-            shutil.rmtree(f'./temp_hyper_para_{args.dataset_type}_{args.model_type}_{args.exp_task}')
-        os.makedirs(f'./temp_hyper_para_{args.dataset_type}_{args.model_type}_{args.exp_task}')
+        if os.path.exists(f'./temp_hyper_para_{args.dataset_type}_{args.model_size}_{args.exp_task}'): 
+            shutil.rmtree(f'./temp_hyper_para_{args.dataset_type}_{args.model_size}_{args.exp_task}')
+        os.makedirs(f'./temp_hyper_para_{args.dataset_type}_{args.model_size}_{args.exp_task}')
         with Pool(50) as pool:
             pool.map(hyper_para_search_worker, all_arg)
         # hyper_para_search_worker(all_arg)
 
         all_search_result = []
-        for file in tqdm(os.listdir(f'./temp_hyper_para_{args.dataset_type}_{args.model_type}_{args.exp_task}')):
-            all_search_result.append(json.load(open(f'./temp_hyper_para_{args.dataset_type}_{args.model_type}_{args.exp_task}/{file}', 'r')))
+        for file in tqdm(os.listdir(f'./temp_hyper_para_{args.dataset_type}_{args.model_size}_{args.exp_task}')):
+            all_search_result.append(json.load(open(f'./temp_hyper_para_{args.dataset_type}_{args.model_size}_{args.exp_task}/{file}', 'r')))
         all_search_result = sorted(all_search_result, key=lambda x: float(x[2]))
-        shutil.rmtree(f'./temp_hyper_para_{args.dataset_type}_{args.model_type}_{args.exp_task}')
+        shutil.rmtree(f'./temp_hyper_para_{args.dataset_type}_{args.model_size}_{args.exp_task}')
         is_medfilter_flag = 'have_medfilter' if args.is_medfilter else 'no_medfilter'
         if not os.path.exists(f'./hyper_para_search_result_for_{args.exp_task}'): os.makedirs(f'./hyper_para_search_result_for_{args.exp_task}')
-        json.dump(all_search_result, open(f'./hyper_para_search_result_for_{args.exp_task}/{args.dataset_type}_{args.train_dataset_type}_{args.model_type}_ckpt-{best_ckpt}_layer{args.layer_num}_{is_medfilter_flag}_{args.filter_wind}.json', 'w'))
+        json.dump(all_search_result, open(f'./hyper_para_search_result_for_{args.exp_task}/{args.dataset_type}_{args.model_size}_ckpt-{best_ckpt}_layer{args.layer_num}_{is_medfilter_flag}_{args.filter_wind}.json', 'w'))

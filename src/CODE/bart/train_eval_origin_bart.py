@@ -101,7 +101,7 @@ class BARTDataset(Dataset):
 if __name__ == "__main__":
     setup_seed()
     flags = argparse.ArgumentParser()
-    flags.add_argument('-model_type',          default='base', type=str)
+    flags.add_argument('-model_size',          default='base', type=str)
 
     flags.add_argument('-dataset_path',        default='./4to1_dataset', type=str)
     flags.add_argument('-dataset_type',        default='delve', type=str)
@@ -129,20 +129,20 @@ if __name__ == "__main__":
     
     
     args, unknown   = flags.parse_known_args()
-    print(args.model_type)
+    print(args.model_size)
     print(args.dataset_type)
-    model_type = args.model_type # 选择base或者large
+    model_size = args.model_size # 选择base或者large
     tag = f'{args.dataset_type}_{str(args.lr)}_{args.epochs}_{args.batch_size}{args.gradient_accumulation_steps}{args.num_workers}'
-    args.output_dir = f'{args.output_dir}{model_type}/'+tag
+    args.output_dir = f'{args.output_dir}{model_size}/'+tag
     if not os.path.exists(args.output_dir): os.makedirs(args.output_dir)
 
-    tokenizer = BartTokenizer.from_pretrained(f'{args.tokenizer_path}{model_type}/', local_files_only=True)
+    tokenizer = BartTokenizer.from_pretrained(f'{args.tokenizer_path}{model_size}/', local_files_only=True)
     tokenizer.add_special_tokens({"additional_special_tokens": ['<doc-sep>','<sen-sep>']})
     
-    model_config = BartConfig.from_pretrained(f'{args.init_model_path}{model_type}/', local_files_only=True)
+    model_config = BartConfig.from_pretrained(f'{args.init_model_path}{model_size}/', local_files_only=True)
     model_config.max_length = args.max_tgt_len
     
-    model = BartForConditionalGeneration.from_pretrained(f'{args.init_model_path}{model_type}/', local_files_only=True, ignore_mismatched_sizes=True, config=model_config)
+    model = BartForConditionalGeneration.from_pretrained(f'{args.init_model_path}{model_size}/', local_files_only=True, ignore_mismatched_sizes=True, config=model_config)
     
     model.resize_token_embeddings(len(tokenizer))
     

@@ -103,34 +103,6 @@ def attn_matrix_spilt(attn_tensor, generated_seq, tokenizer, input_txt, args):
         matrix_after_split.append(sen2all_input_doc_matrix)
     return matrix_after_split
 
-def middle_pooling(attn_tensor, generated_seq, tokenizer, input_txt, args):
-    matrix_after_split = attn_matrix_spilt(attn_tensor, generated_seq, tokenizer, input_txt, args)
-    final_scores = []
-    for sen2all_input_doc_matrix in matrix_after_split:
-        sen2all_doc_scores = []
-        for sub_matrix_detail in sen2all_input_doc_matrix:
-            sub_matrix = sub_matrix_detail['sub_matrix']
-            sub_matrix = sub_matrix.numpy()
-            score = round(np.median(sub_matrix), 8) 
-            sen2all_doc_scores.append(score)
-        final_scores.append(sen2all_doc_scores)
-    return final_scores
-
-
-def max_pooling(attn_tensor, generated_seq, tokenizer, input_txt, args):
-    matrix_after_split = attn_matrix_spilt(attn_tensor, generated_seq, tokenizer, input_txt, args)
-    final_scores = []
-    for sen2all_input_doc_matrix in matrix_after_split:
-        sen2all_doc_scores = []
-        for sub_matrix_detail in sen2all_input_doc_matrix:
-            sub_matrix = sub_matrix_detail['sub_matrix']
-            sub_matrix = sub_matrix.numpy()
-            score = round(np.max(sub_matrix), 8) 
-            sen2all_doc_scores.append(score)
-        final_scores.append(sen2all_doc_scores)
-    return final_scores
-
-
 def mean_sum_pooling(attn_tensor, generated_seq, tokenizer, input_txt, args):
     global all_ids_count
     alpha = args.alpha
@@ -166,7 +138,7 @@ def mean_sum_pooling(attn_tensor, generated_seq, tokenizer, input_txt, args):
 
 def word_frequency_count(tokenizer, args):
     # 统计生成的文本中的词频，返回词为单位，以及句子为单位的统计结果
-    jsonlines = json.load(open(f'{args.dataset_path}train_{args.dataset_type}_{args.train_dataset_type}.json', 'r'))
+    jsonlines = json.load(open(f'./datasets_with_generated_summary/train_t5_{self.args.model_size}_{self.args.dataset_type}.json', 'r'))
     all_ids = []
     for line in jsonlines:
         truncked_summary_ids = tokenizer.encode(line['txt_gds'], max_length=args.max_tgt_len+2, truncation=True)[1:-1]
@@ -180,7 +152,7 @@ class T5TestDataset(Dataset):
         self.tokenizer = tokenizer
         self.args = args
         self.config = config
-        jsonlines = json.load(open(f'./test/test_{self.args.model_type}_{self.args.dataset_type}.json', 'r'))
+        jsonlines = json.load(open(f'./datasets_with_generated_summary/{mode}_t5_{self.args.model_size}_{self.args.dataset_type}.json', 'r'))
         self.datas = []
         for json_line in tqdm(jsonlines):
             truncated_multi_docs = []
@@ -234,16 +206,15 @@ if __name__ == "__main__":
     flags.add_argument('-exp_task',            default='main_result', type=str)  # main_result, diff_layer, diff_ckpt
     flags.add_argument('-dataset_path',        default='../new_data_for_lw/', type=str)
     flags.add_argument('-dataset_type',        default='s2orc', type=str)
-    flags.add_argument('-train_dataset_type',  default='small', type=str)
     flags.add_argument('-tokenizer_path',      default=f'./tokenizer_config/', type=str)
     flags.add_argument('-init_model_path',     default=f'./init_model/', type=str)
-    flags.add_argument('-best_ckpt',           default='ckpt', type=str)
+    flags.add_argument('-best_ckpt',           default='assigned', type=str)
     flags.add_argument('-ckpts_path',          default=f'./ckpts/base/s2orc_0.0001_15_314/', type=str)
     flags.add_argument('-max_src_len',         default=1024,    type=int)
     flags.add_argument('-max_tgt_len',         default=100,      type=int)
     flags.add_argument('-max_doc_len',         default=250,     type=int)
     flags.add_argument('-output_scores',       default=True,     type=bool)
-    flags.add_argument('-strategys',           default=['mean_sum', 'middle', 'max'], type=list)  # ,'mean_sum','mean','middle','max'
+    flags.add_argument('-strategys',           default=['mean_sum'], type=list)  # ,'mean_sum','mean','middle','max'
     flags.add_argument('-device',              default=0,       type=int)
     flags.add_argument('-mode',                default='test',    type=str)
 
@@ -254,12 +225,12 @@ if __name__ == "__main__":
     elif args.best_ckpt == 'init':
         best_ckpt = 'init'
         ckpt_path = args.init_model_path
-    else:
+    if args.best_ckpt == 'assigned':
         best_ckpt = args.best_ckpt
-        ckpt_path = f'{args.ckpts_path}checkpoint-{args.best_ckpt}'
+        ckpt_path = args.ckpts_path
     
     is_medfilter_flag = 'have_medfilter' if args.is_medfilter else 'no_medfilter'
-    hyper_parameter_search_result = json.load(open(f'./hyper_para_search_result_for_{args.exp_task}/{args.dataset_type}_{args.train_dataset_type}_{args.model_type}_ckpt-{best_ckpt}_layer{args.layer_num}_{is_medfilter_flag}.json', 'r'))
+    hyper_parameter_search_result = json.load(open(f'./hyper_para_search_result_for_{args.exp_task}/{args.dataset_type}_{args.model_type}_ckpt-{best_ckpt}_layer{args.layer_num}_{is_medfilter_flag}.json', 'r'))
     args.alpha = hyper_parameter_search_result[0][0]
     args.beta = hyper_parameter_search_result[0][1]
     print(args)
@@ -365,11 +336,11 @@ if __name__ == "__main__":
             single_stgy_result[stgy]['auroc'] = roc_auc_score(y_true, y_score)
             single_stgy_result[stgy]['aupr'] = average_precision_score(y_true, y_score)
 
-        print(single_stgy_result)
+        print(single_stgy_result['mean_sum'])
         if args.best_ckpt == 'init':
             args.best_ckpt = '0'
         if not os.path.exists(f'./result_of_{args.exp_task}'): os.makedirs(f'./result_of_{args.exp_task}')
         # json.dump(single_stgy_result, open(f'./result_of_{args.exp_task}/{args.dataset_type}_{args.train_dataset_type}_{args.model_type}_ckpt-{best_ckpt}_layer{args.layer_num}_{is_medfilter_flag}_{args.filter_wind}.json', 'w'))
-        json.dump(single_stgy_result, open(f'./result_of_{args.exp_task}/{args.dataset_type}_{args.train_dataset_type}_{args.model_type}_ckpt-{best_ckpt}_layer{args.layer_num}_{is_medfilter_flag}.json', 'w'))
+        json.dump(single_stgy_result, open(f'./result_of_{args.exp_task}/{args.dataset_type}_{args.model_type}_ckpt-{best_ckpt}_layer{args.layer_num}_{is_medfilter_flag}.json', 'w'))
         if args.output_scores:
             json.dump(scores_for_roc, open('our_method_for_roc.json', 'w'))

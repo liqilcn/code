@@ -79,17 +79,14 @@ class T5Dataset(Dataset):
     def __getitem__(self, index):
         data_line = self.datas[index]
         src_txt, tgt_txt = data_line[0], data_line[1]
-        input_encodings = self.tokenizer(src_txt, padding='max_length', max_length=self.args.max_src_len, truncation=True, return_tensors="pt")  # return_tensors="pt"不指定返回的不是tensor，是列表
+        input_encodings = self.tokenizer(src_txt, padding='max_length', max_length=self.args.max_src_len, truncation=True, return_tensors="pt")  
         target_encodings = self.tokenizer(tgt_txt, padding='max_length', max_length=self.args.max_tgt_len+20, truncation=True, return_tensors="pt")
         pad_token_id = self.tokenizer.pad_token_id
         input_ids = input_encodings['input_ids'].squeeze(0)
         attention_mask = input_encodings['attention_mask'].squeeze(0)
         
-        labels = target_encodings['input_ids']  # label for T5与BART不同: i love you</s>
-        labels[labels == pad_token_id] = -100  # 这一步必须加，需要不计算<pad> token的loss，官方文档未加是因为只有一个例子，未放在batch里，没有pad，所有不需要加，batch训练必须加
-        # 见https://huggingface.co/docs/transformers/model_doc/t5#training
-        # 与BART不同，T5不需要decoder_input_ids, 其在内部完成自动右移，将label变为<pad> i love you作为decoder_input_ids
-        # 这步非常重要，否则模型将不知道何时停止，无休止生成
+        labels = target_encodings['input_ids']  
+        labels[labels == pad_token_id] = -100  
         inputs = {
                 'input_ids':input_ids, 
                 'attention_mask': attention_mask, 
@@ -100,7 +97,7 @@ class T5Dataset(Dataset):
 if __name__ == "__main__":
     setup_seed()
     flags = argparse.ArgumentParser()
-    flags.add_argument('-model_type',          default='base', type=str)
+    flags.add_argument('-model_size',          default='base', type=str)
 
     flags.add_argument('-dataset_path',        default='../new_data_for_lw', type=str)
     flags.add_argument('-dataset_type',        default='delve', type=str)
@@ -128,19 +125,18 @@ if __name__ == "__main__":
     
     
     args, unknown   = flags.parse_known_args()
-    print(args.model_type)
+    print(args.model_size)
     print(args.dataset_type)
-    model_type = args.model_type # 选择base或者large
+    model_size = args.model_size 
     tag = f'{args.dataset_type}_{str(args.lr)}_{args.epochs}_{args.batch_size}{args.gradient_accumulation_steps}{args.num_workers}'
-    args.output_dir = f'{args.output_dir}{model_type}/'+tag
+    args.output_dir = f'{args.output_dir}{model_size}/'+tag
     if not os.path.exists(args.output_dir): os.makedirs(args.output_dir)
 
-    tokenizer = T5Tokenizer.from_pretrained(f'{args.tokenizer_path}{model_type}/', local_files_only=True)
-    tokenizer.add_special_tokens({"additional_special_tokens": ['<doc-sep>','<sen-sep>']}) # 返回值是词表新增token数，如果不添加特殊token，则tokenize后为['<', 'doc', '-', 'se', 'p', '>']
-    # tokenizer.pad_token = tokenizer.eos_token
+    tokenizer = T5Tokenizer.from_pretrained(f'{args.tokenizer_path}{model_size}/', local_files_only=True)
+    tokenizer.add_special_tokens({"additional_special_tokens": ['<doc-sep>','<sen-sep>']}) 
     
-    model_config = T5Config.from_pretrained(f'{args.init_model_path}{model_type}/', local_files_only=True)
-    model = T5ForConditionalGeneration.from_pretrained(f'{args.init_model_path}{model_type}/', local_files_only=True, config=model_config)
+    model_config = T5Config.from_pretrained(f'{args.init_model_path}{model_size}/', local_files_only=True)
+    model = T5ForConditionalGeneration.from_pretrained(f'{args.init_model_path}{model_size}/', local_files_only=True, config=model_config)
     model.resize_token_embeddings(len(tokenizer))
     
         
@@ -168,7 +164,7 @@ if __name__ == "__main__":
         lr_scheduler_type='linear', # "linear, cosine, cosine_with_restarts, polynomial, constant_with_warmup"
         warmup_steps=args.warmup_steps,
         weight_decay=args.weight_decay,
-        # adafactor=True,  # 使用 AdamW 优化器时，T5 模型需要的学习率略高于 Trainer 中的默认设置。 通常，1e-4 和 3e-4 适用于大多数问题（分类、摘要、翻译、问答、问题生成）。 请注意，T5 是使用 AdaFactor 优化器进行预训练的。（来源于hugging face官网）
+        # adafactor=True, 
         # label_smoothing_factor=0.1,
         # log
         log_on_each_node=True,
