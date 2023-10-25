@@ -186,4 +186,4 @@ Here is an example of output.
 ```
 
 ## License
-Our code and datasets are licensed under a [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) license. 
+Our code and datasets are licensed under a [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) license.
