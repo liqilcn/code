@@ -169,13 +169,13 @@ Here is an example of output.
 ```
 #### FT-ALL
 
-Here is an example for training baseline Frozen on T5-Large and Delve-OD (1K):
+Here is an example for training baseline FT-ALL on T5-Large and Delve-OD (1K):
 ```
 cd ./src/baselines/t5
 python train_ft_all.py -model_size large -dataset_type delve_1k  -decoder_layer 23 -init_model_path "PATH of the best pre-training checkpoint"
 ```
 
-Here is an example for testing baseline Frozen on T5-Large and Delve-OD (1K):
+Here is an example for testing baseline FT-ALL on T5-Large and Delve-OD (1K):
 ```
 cd ./src/baselines/t5
 python test_ft_all.py -model_size large -dataset_type delve_1k -decoder_layer 23 -ckpts_path "PATH of all checkpoints"
