@@ -152,7 +152,7 @@ class RelationBARTTestDataset(Dataset):
         self.tokenizer = tokenizer
         self.args = args
         self.config = config
-        jsonlines = json.load(open(f'./datasets_with_generated_summary/{mode}_bart_{self.args.model_size}_{self.args.dataset_type}.json', 'r'))
+        jsonlines = json.load(open(f'./datasets_with_generated_summary/{mode}_bart_{args.model_size}_{args.dataset_type}.json', 'r'))
         self.datas = []
         for json_line in tqdm(jsonlines):
             truncated_multi_docs = []
@@ -207,7 +207,7 @@ if __name__ == "__main__":
     flags.add_argument('-dataset_type',        default='samsum', type=str)
     flags.add_argument('-tokenizer_path',      default=f'./tokenizer_config/', type=str)
     flags.add_argument('-init_model_path',     default=f'./init_model/', type=str)
-    flags.add_argument('-best_ckpt',           default='ckpt', type=str)
+    flags.add_argument('-best_ckpt',           default='assigned', type=str)
     flags.add_argument('-ckpts_path',          default=f'./ckpts/base/samsum_3e-05_15_814/', type=str)
     flags.add_argument('-max_src_len',         default=1024,    type=int)
     flags.add_argument('-filter_wind',         default=5,    type=int)
@@ -220,16 +220,16 @@ if __name__ == "__main__":
 
 
     args, unknown   = flags.parse_known_args()
-    
-    if args.best_ckpt == 'ckpt':
+
+    if args.best_ckpt == 'auto':
         best_ckpt = get_best_step(args.ckpts_path)
         ckpt_path = f'{args.ckpts_path}/checkpoint-{best_ckpt}'
     elif args.best_ckpt == 'init':
         best_ckpt = 'init'
         ckpt_path = args.init_model_path
-    else:
+    if args.best_ckpt == 'assigned':
         best_ckpt = args.best_ckpt
-        ckpt_path = f'{args.ckpts_path}checkpoint-{args.best_ckpt}'
+        ckpt_path = args.ckpts_path
         
 
     is_medfilter_flag = 'have_medfilter' if args.is_medfilter else 'no_medfilter'

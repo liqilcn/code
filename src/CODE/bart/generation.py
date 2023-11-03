@@ -165,7 +165,7 @@ if __name__ == "__main__":
     generated_txt = [t.replace('<sen-sep>', '').replace('</s>', '').replace('<s>', '').replace('<pad>', '') for t in generated_txt]
     
     # 将生成的summary写入到原始数据集中，不同模型的size，type和不同的数据集生成的summary不尽相同
-    if self.args.dataset_type.startswith('delve') and (args.mode == 'valid' or args.mode == 'test'):
+    if args.dataset_type.startswith('delve') and (args.mode == 'valid' or args.mode == 'test'):
         origin_dataset = json.load(open(f'{args.dataset_path}{args.mode}_delve.json', 'r'))
     else:
         origin_dataset = json.load(open(f'{args.dataset_path}{args.mode}_{self.args.dataset_type}.json', 'r'))

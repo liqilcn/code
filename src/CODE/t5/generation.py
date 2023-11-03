@@ -74,8 +74,8 @@ if __name__ == "__main__":
     flags.add_argument('-exp_task',            default='filter_wind', type=str)  # main_result, diff_layer, diff_ckpt
     flags.add_argument('-dataset_path',        default='../../new_data_for_lw/', type=str)
     flags.add_argument('-dataset_type',        default='s2orc', type=str)
-    flags.add_argument('-tokenizer_path',      default=f'../tokenizer_config/', type=str)
-    flags.add_argument('-init_model_path',     default=f'../init_model/', type=str)
+    flags.add_argument('-tokenizer_path',      default=f'./tokenizer_config/', type=str)
+    flags.add_argument('-init_model_path',     default=f'./init_model/', type=str)
     flags.add_argument('-best_ckpt',           default='assigned', type=str)  # option: 'init', 'auto', 'assigned'
     flags.add_argument('-ckpts_path',          default=f'../ckpts/base/s2orc_0.0001_15_314/', type=str)
     flags.add_argument('-max_src_len',         default=1024,    type=int)
@@ -93,7 +93,7 @@ if __name__ == "__main__":
     elif args.best_ckpt == 'init':
         best_ckpt = 'init'
         ckpt_path = args.init_model_path
-    elif args.best_ckpt == 'assigned'::
+    elif args.best_ckpt == 'assigned':
         best_ckpt = 'assigned'
         ckpt_path = args.ckpts_path
     
@@ -152,7 +152,7 @@ if __name__ == "__main__":
             sequence.append(string.strip())
             # break
     
-    if self.args.dataset_type.startswith('delve') and (args.mode == 'valid' or args.mode == 'test'):
+    if args.dataset_type.startswith('delve') and (args.mode == 'valid' or args.mode == 'test'):
         origin_dataset = json.load(open(f'{args.dataset_path}{args.mode}_delve.json', 'r'))
     else:
         origin_dataset = json.load(open(f'{args.dataset_path}{args.mode}_{self.args.dataset_type}.json', 'r'))
@@ -160,6 +160,6 @@ if __name__ == "__main__":
     if not os.path.exists('./datasets_with_generated_summary'): os.makedirs('./datasets_with_generated_summary')
 
     for i in range(len(sequence)):
-        origin_dataset[i]['txt_gds'][0] = generated_txt[i].strip(', ')
+        origin_dataset[i]['txt_gds'][0] = sequence[i].strip(', ')
 
     json.dump(origin_dataset, open(f'./datasets_with_generated_summary/{args.mode}_t5_{args.model_size}_{args.dataset_type}.json', 'w'))

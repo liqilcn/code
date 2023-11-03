@@ -138,7 +138,7 @@ def mean_sum_pooling(attn_tensor, generated_seq, tokenizer, input_txt, args):
 
 def word_frequency_count(tokenizer, args):
     # 统计生成的文本中的词频，返回词为单位，以及句子为单位的统计结果
-    jsonlines = json.load(open(f'./datasets_with_generated_summary/train_t5_{self.args.model_size}_{self.args.dataset_type}.json', 'r'))
+    jsonlines = json.load(open(f'./datasets_with_generated_summary/train_t5_{args.model_size}_{args.dataset_type}.json', 'r'))
     all_ids = []
     for line in jsonlines:
         truncked_summary_ids = tokenizer.encode(line['txt_gds'], max_length=args.max_tgt_len+2, truncation=True)[1:-1]
@@ -199,7 +199,7 @@ class T5TestDataset(Dataset):
 if __name__ == "__main__":
     setup_seed()
     flags = argparse.ArgumentParser()
-    flags.add_argument('-model_type',          default='large', type=str)
+    flags.add_argument('-model_size',          default='large', type=str)
     flags.add_argument('-layer_num',           default=23,  type=int)  
     flags.add_argument('-is_medfilter',        default=True,  type=bool) 
     flags.add_argument('-filter_wind',         default=5,  type=int) 
@@ -208,7 +208,7 @@ if __name__ == "__main__":
     flags.add_argument('-dataset_type',        default='s2orc', type=str)
     flags.add_argument('-tokenizer_path',      default=f'./tokenizer_config/', type=str)
     flags.add_argument('-init_model_path',     default=f'./init_model/', type=str)
-    flags.add_argument('-best_ckpt',           default='assigned', type=str)
+    flags.add_argument('-best_ckpt',           default='assigned', type=str)  # option: 'auto', 'init', assigned
     flags.add_argument('-ckpts_path',          default=f'./ckpts/base/s2orc_0.0001_15_314/', type=str)
     flags.add_argument('-max_src_len',         default=1024,    type=int)
     flags.add_argument('-max_tgt_len',         default=100,      type=int)
@@ -219,7 +219,7 @@ if __name__ == "__main__":
     flags.add_argument('-mode',                default='test',    type=str)
 
     args, unknown   = flags.parse_known_args()
-    if args.best_ckpt == 'ckpt':
+    if args.best_ckpt == 'auto':
         best_ckpt = get_best_step(args.ckpts_path)
         ckpt_path = f'{args.ckpts_path}/checkpoint-{best_ckpt}'
     elif args.best_ckpt == 'init':
@@ -230,14 +230,14 @@ if __name__ == "__main__":
         ckpt_path = args.ckpts_path
     
     is_medfilter_flag = 'have_medfilter' if args.is_medfilter else 'no_medfilter'
-    hyper_parameter_search_result = json.load(open(f'./hyper_para_search_result_for_{args.exp_task}/{args.dataset_type}_{args.model_type}_ckpt-{best_ckpt}_layer{args.layer_num}_{is_medfilter_flag}.json', 'r'))
+    hyper_parameter_search_result = json.load(open(f'./hyper_para_search_result_for_{args.exp_task}/{args.dataset_type}_{args.model_size}_ckpt-{best_ckpt}_layer{args.layer_num}_{is_medfilter_flag}.json', 'r'))
     args.alpha = hyper_parameter_search_result[0][0]
     args.beta = hyper_parameter_search_result[0][1]
     print(args)
     device = f'cuda:{args.device}' if torch.cuda.is_available() else 'cpu'
 
-    args.tokenizer_path = f'{args.tokenizer_path}{args.model_type}/'
-    args.init_model_path = f'{args.init_model_path}{args.model_type}/'
+    args.tokenizer_path = f'{args.tokenizer_path}{args.model_size}/'
+    args.init_model_path = f'{args.init_model_path}{args.model_size}/'
 
     tokenizer = T5Tokenizer.from_pretrained(args.tokenizer_path, local_files_only=True)
     tokenizer.add_special_tokens({"additional_special_tokens": ['<doc-sep>','<sen-sep>']}) 
@@ -340,7 +340,7 @@ if __name__ == "__main__":
         if args.best_ckpt == 'init':
             args.best_ckpt = '0'
         if not os.path.exists(f'./result_of_{args.exp_task}'): os.makedirs(f'./result_of_{args.exp_task}')
-        # json.dump(single_stgy_result, open(f'./result_of_{args.exp_task}/{args.dataset_type}_{args.train_dataset_type}_{args.model_type}_ckpt-{best_ckpt}_layer{args.layer_num}_{is_medfilter_flag}_{args.filter_wind}.json', 'w'))
-        json.dump(single_stgy_result, open(f'./result_of_{args.exp_task}/{args.dataset_type}_{args.model_type}_ckpt-{best_ckpt}_layer{args.layer_num}_{is_medfilter_flag}.json', 'w'))
+        # json.dump(single_stgy_result, open(f'./result_of_{args.exp_task}/{args.dataset_type}_{args.train_dataset_type}_{args.model_size}_ckpt-{best_ckpt}_layer{args.layer_num}_{is_medfilter_flag}_{args.filter_wind}.json', 'w'))
+        json.dump(single_stgy_result, open(f'./result_of_{args.exp_task}/{args.dataset_type}_{args.model_size}_ckpt-{best_ckpt}_layer{args.layer_num}_{is_medfilter_flag}.json', 'w'))
         if args.output_scores:
             json.dump(scores_for_roc, open('our_method_for_roc.json', 'w'))
